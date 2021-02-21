@@ -1,0 +1,119 @@
+version: "3.2"
+services:
+
+  webserver:
+    build:
+      context: ./env/nginx
+      dockerfile: Dockerfile
+    image: larahouse/webserver:1.0
+    container_name: webserver
+    working_dir: /etc/nginx
+    restart: on-failure
+    ports:
+      - "80:80"
+      - "443:443"
+      - "6060:6060"
+    networks:
+      - backend
+    volumes:
+      - ./src/:/var/www
+      - ./env/nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - phpfpm
+  
+  phpfpm:
+    build:
+      context: ./env/php
+      dockerfile: Dockerfile
+    image: larahouse/phpfpm:7.4
+    container_name: phpfpm
+    working_dir: /var/www
+    restart: on-failure
+    networks:
+      - backend
+    volumes:
+      - ./src/:/var/www
+      - ./env/php/php.ini:/opt/bitnami/php/etc/php.ini
+
+  supervisor:
+    build:
+      context: ./env/supervisor
+      dockerfile: Dockerfile
+    image: larahouse/supervisor:7.4
+    container_name: supervisor
+    working_dir: /var/www
+    restart: on-failure
+    networks:
+      - backend
+    volumes:
+      - ./src/:/var/www
+      - ./env/supervisor/php.ini:/opt/bitnami/php/etc/php.ini
+      - ./env/supervisor/worker/:/etc/supervisor/conf.d
+
+  workspace:
+    build:
+      context: ./env/workspace
+      dockerfile: Dockerfile
+    image: larahouse/workspace:7.4
+    container_name: workspace
+    working_dir: /var/www
+    restart: on-failure
+    networks:
+      - backend
+    volumes:
+      - ./env/workspace/php.ini:/opt/bitnami/php/etc/php.ini
+      - ./src/:/var/www
+  
+  maildev:
+    build:
+      context: ./env/maildev
+      dockerfile: Dockerfile
+    image: larahouse/maildev:1.0
+    container_name: maildev
+    restart: on-failure
+    networks:
+      - backend
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+    
+  mysql:
+    image: mysql:5.7.32
+    container_name: mysql
+    restart: on-failure
+    networks:
+      - backend
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_USER: root
+      MYSQL_PASSWORD: secret
+    volumes:
+      - storage_db:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: on-failure
+    networks:
+      - backend
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: secret
+    ports:
+      - 9090:80
+    depends_on:
+      - mysql
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: on-failure
+    networks:
+      - backend
+
+networks:
+  backend:
+
+volumes:
+  storage_db:
